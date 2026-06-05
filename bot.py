@@ -52,6 +52,8 @@ async def get_video_info(session: aiohttp.ClientSession, url: str) -> dict:
     parsed = urlparse(final_url)
     params = parse_qs(parsed.query)
     surl = params.get("surl", [None])[0]
+
+    # /app/ format se surl extract karo
     if not surl:
         path_parts = parsed.path.rstrip("/").split("/")
         surl = path_parts[-1] if path_parts else None
@@ -59,26 +61,47 @@ async def get_video_info(session: aiohttp.ClientSession, url: str) -> dict:
     if not surl:
         return {"error": "URL se share token nahi mila"}
 
-    api_url = "https://www.1024tera.com/api/shorturlinfo"
-    api_params = {"app_id": "250528", "shorturl": surl, "root": "1"}
+    # Method 1: TeraBox shorturlinfo API
     cookie_headers = {**HEADERS, "Cookie": COOKIE} if COOKIE else HEADERS
+    for api_base in ["https://www.1024tera.com", "https://www.terabox.com", "https://www.diskwala.com"]:
+        try:
+            api_url = f"{api_base}/api/shorturlinfo"
+            api_params = {"app_id": "250528", "shorturl": surl, "root": "1"}
+            async with session.get(api_url, params=api_params, headers=cookie_headers,
+                                   timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                data = await resp.json(content_type=None)
+                if data.get("errno") == 0:
+                    file_list = data.get("list", [])
+                    video_file = next((f for f in file_list if f.get("isdir") == 0), None)
+                    if video_file:
+                        return {
+                            "filename": video_file.get("server_filename", "video.mp4"),
+                            "size": int(video_file.get("size", 0)),
+                            "dlink": video_file.get("dlink", ""),
+                            "thumbnail": video_file.get("thumbs", {}).get("url3", ""),
+                        }
+        except Exception as e:
+            logger.error(f"API {api_base} error: {e}")
+            continue
 
+    # Method 2: fileinfo API
     try:
+        api_url = "https://www.1024tera.com/api/file/fileinfo"
+        api_params = {"app_id": "250528", "shorturl": surl}
         async with session.get(api_url, params=api_params, headers=cookie_headers,
                                timeout=aiohttp.ClientTimeout(total=20)) as resp:
-            data = await resp.json()
+            data = await resp.json(content_type=None)
             if data.get("errno") == 0:
-                file_list = data.get("list", [])
-                video_file = next((f for f in file_list if f.get("isdir") == 0), None)
-                if video_file:
+                info = data.get("list", [{}])[0]
+                if info.get("dlink"):
                     return {
-                        "filename": video_file.get("server_filename", "video.mp4"),
-                        "size": int(video_file.get("size", 0)),
-                        "dlink": video_file.get("dlink", ""),
-                        "thumbnail": video_file.get("thumbs", {}).get("url3", ""),
+                        "filename": info.get("server_filename", "video.mp4"),
+                        "size": int(info.get("size", 0)),
+                        "dlink": info.get("dlink", ""),
+                        "thumbnail": "",
                     }
     except Exception as e:
-        logger.error(f"Primary API error: {e}")
+        logger.error(f"fileinfo API error: {e}")
 
     return await get_video_info_v2(session, url, surl)
 
