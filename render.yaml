@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: diskwala-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 1 --threads 4 --timeout 120 "bot:create_app()"
+    envVars:
+      - key: BOT_TOKEN
+        sync: false        # Render dashboard mein manually set karein
+      - key: COOKIE
+        sync: false        # Optional
+      - key: WEBHOOK_URL
+        sync: false        # Deploy hone ke baad apna Render URL yahan daalna
