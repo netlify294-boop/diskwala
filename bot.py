@@ -23,7 +23,7 @@ flask_app = Flask(__name__)
 DISKWALA_PATTERN = re.compile(
     r"https?://(?:www\.)?(?:diskwala\.com|1024terabox\.com|terabox\.com|"
     r"teraboxapp\.com|4funbox\.com|mirrobox\.com|nephobox\.com|freeterabox\.com)"
-    r"/(?:s|sharing/link)/([A-Za-z0-9_-]+)"
+    r"/(?:s|sharing/link|app)/([A-Za-z0-9_-]+)"
 )
 
 HEADERS = {
